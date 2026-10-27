@@ -1,0 +1,56 @@
+name: Release macOS app
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Identify Swift toolchain
+        id: swift
+        run: |
+          toolchain=$( { swift --version; xcodebuild -version; } | shasum -a 256 | cut -d ' ' -f 1)
+          echo "toolchain=$toolchain" >> "$GITHUB_OUTPUT"
+      - name: Cache Swift build
+        uses: actions/cache@v6
+        with:
+          path: macos/Wi2Agent/.build
+          key: swift-${{ runner.os }}-${{ runner.arch }}-${{ steps.swift.outputs.toolchain }}-${{ hashFiles('macos/Wi2Agent/Package.swift', 'scripts/build-macos.zsh', '.github/workflows/release-macos.yml') }}-${{ hashFiles('macos/Wi2Agent/Sources/**/*.swift', 'macos/Wi2Agent/Tests/**/*.swift') }}
+          restore-keys: |
+            swift-${{ runner.os }}-${{ runner.arch }}-${{ steps.swift.outputs.toolchain }}-${{ hashFiles('macos/Wi2Agent/Package.swift', 'scripts/build-macos.zsh', '.github/workflows/release-macos.yml') }}-
+      - name: Test
+        run: swift test -c release --arch arm64 --disable-index-store --package-path macos/Wi2Agent
+      - name: Build arm64 app
+        run: zsh scripts/build-macos.zsh
+      - name: Verify version and architecture
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' macos/Wi2Agent/Info.plist)
+          test "$RELEASE_TAG" = "v$version"
+          test "$(lipo -archs macos/Wi2Agent/.build/Wi2Agent.app/Contents/MacOS/wi2-agent)" = arm64
+      - name: Checksum installer
+        working-directory: macos/Wi2Agent/.build
+        run: shasum -a 256 Wi2Agent-macos-arm64.pkg > Wi2Agent-macos-arm64.pkg.sha256
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" --verify-tag --title "Wi2Agent $RELEASE_TAG" \
+            --notes-file macos/Wi2Agent/RELEASE.md \
+            macos/Wi2Agent/.build/Wi2Agent-macos-arm64.pkg macos/Wi2Agent/.build/Wi2Agent-macos-arm64.pkg.sha256

@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wi2-free",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-14",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": false,
+  "migrations": [
+    {
+      "tag": "v2",
+      "deleted_classes": [
+        "Wi2Request"
+      ]
+    }
+  ],
+  "vars": {
+    "DEFAULT_WI2_TO": "guestsrv-J@forguest.wi2.ne.jp"
+  },
+  "keep_vars": true
+}
