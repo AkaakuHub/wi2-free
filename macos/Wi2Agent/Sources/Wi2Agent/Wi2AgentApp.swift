@@ -19,11 +19,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 struct Wi2AgentApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
   @StateObject private var viewModel = Wi2SessionViewModel()
+  @StateObject private var notificationPermission = NotificationPermission()
   @Environment(\.openWindow) private var openWindow
 
   var body: some Scene {
     Window("Wi2ゲスト接続", id: "session") {
-      Wi2SessionView(viewModel: viewModel)
+      Wi2SessionView(viewModel: viewModel, notificationPermission: notificationPermission)
     }
     .windowResizability(.contentSize)
 

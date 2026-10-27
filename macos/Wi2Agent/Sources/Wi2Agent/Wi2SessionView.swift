@@ -2,85 +2,128 @@ import SwiftUI
 
 struct Wi2SessionView: View {
   @ObservedObject var viewModel: Wi2SessionViewModel
+  @ObservedObject var notificationPermission: NotificationPermission
+  @State private var isShowingSettings = false
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      Text("Wi2ゲスト接続").font(.title2.bold())
-      DisclosureGroup(viewModel.isTokenConfigured ? "API設定を変更" : "APIを設定") {
-        TextField("API接続先（https://example.com/code）", text: $viewModel.apiEndpoint)
-          .textFieldStyle(.roundedBorder)
-        SecureField("WorkerのAPIトークン", text: $viewModel.apiToken)
-          .textFieldStyle(.roundedBorder)
-        Button("Keychainへ保存", action: viewModel.saveToken)
-          .disabled(viewModel.apiToken.isEmpty || viewModel.isBusy)
+    VStack(alignment: .leading, spacing: 20) {
+      if viewModel.state.session == nil, !viewModel.state.awaitingLogin {
+        startControls
+      } else {
+        sessionControls
       }
-
-      if let code = viewModel.state.currentCode {
-        codeView(title: "現在のゲストコード", code: code)
-      }
-      if viewModel.state.awaitingLogin {
-        Button("ログイン完了", action: viewModel.confirmLogin)
-          .disabled(viewModel.isBusy)
-      }
-      if let remainingTime = viewModel.remainingTime {
-        Text("残り時間の目安").foregroundStyle(.secondary)
-        Text(remainingTime)
-          .font(.system(size: 44, weight: .bold, design: .rounded))
-          .monospacedDigit()
-        if remainingTime == "00:00" {
-          Text("利用時間を過ぎています。更新用コードで再ログインしてください。コード未取得の場合は、インターネットへ接続できる回線で再取得してください。")
-            .foregroundStyle(.red)
+      if viewModel.isBusy {
+        HStack(spacing: 12) {
+          ProgressView().controlSize(.small)
+          Text(viewModel.status).fixedSize(horizontal: false, vertical: true)
         }
+      } else if viewModel.isError {
+        Text(viewModel.status).foregroundStyle(.red)
+          .fixedSize(horizontal: false, vertical: true)
       }
-      if let code = viewModel.state.renewalCode {
-        codeView(title: "更新用ゲストコード", code: code)
-        Text("Wi2画面でログアウト後、このコードでログインします。接続できたら「更新完了」を押してください。")
-          .foregroundStyle(.secondary)
-        Button("更新完了", action: viewModel.confirmLogin)
-          .disabled(viewModel.isBusy)
-      }
-
-      Text(viewModel.status)
-        .fixedSize(horizontal: false, vertical: true)
-        .foregroundStyle(viewModel.isError ? .red : .secondary)
       if let error = viewModel.notificationError {
         Text(error).foregroundStyle(.orange)
+          .fixedSize(horizontal: false, vertical: true)
       }
-      if viewModel.isBusy { ProgressView().controlSize(.small) }
-
-      HStack {
-        Button("Wi2ログイン画面を開く", action: viewModel.openPortal)
-        if viewModel.state.session != nil, viewModel.state.renewalCode == nil {
-          Button("コード取得を再試行", action: viewModel.retryRenewal)
-            .disabled(viewModel.isBusy || !viewModel.isTokenConfigured)
-        }
-      }
-      if viewModel.state.session == nil, !viewModel.state.awaitingLogin {
-        Button("コード取得→Wi2接続", action: viewModel.startConnection)
-          .buttonStyle(.borderedProminent)
-          .disabled(!viewModel.isTokenConfigured || viewModel.isBusy)
+      if viewModel.state.session != nil || viewModel.state.awaitingLogin {
         Divider()
-        Text("すでにWi2へログインしている場合")
-        Stepper("ログインから約\(viewModel.elapsedMinutes)分", value: $viewModel.elapsedMinutes, in: 0...9)
-        Button("現在の接続を引き継ぐ", action: viewModel.resumeExistingSession)
-          .disabled(!viewModel.isTokenConfigured || viewModel.isBusy)
-      } else {
-        Button("接続管理を停止", action: viewModel.stopSession)
-          .disabled(viewModel.isBusy)
+        HStack {
+          Spacer()
+          Button("接続管理を停止", role: .destructive, action: viewModel.stopSession)
+            .disabled(viewModel.isBusy)
+        }
       }
     }
     .padding(24)
     .frame(width: 480)
+    .toolbar {
+      if viewModel.state.session == nil, !viewModel.state.awaitingLogin {
+        ToolbarItem {
+          Button("Wi2ログイン", systemImage: "globe", action: viewModel.openPortal)
+        }
+      }
+      ToolbarItem {
+        Button("通知設定", systemImage: notificationPermission.isAllowed ? "bell" : "bell.badge") {
+          Task {
+            if notificationPermission.isAllowed { notificationPermission.openSettings() }
+            else { await notificationPermission.request() }
+          }
+        }
+      }
+      ToolbarItem {
+        Button("API設定", systemImage: "gearshape") { isShowingSettings = true }
+      }
+    }
+    .sheet(isPresented: $isShowingSettings) { APISettingsView(viewModel: viewModel) }
+    .task {
+      await notificationPermission.requestOnLaunch()
+      if !viewModel.isTokenConfigured { isShowingSettings = true }
+    }
+    .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+      Task { await notificationPermission.refresh() }
+    }
+  }
+
+  private var startControls: some View {
+    VStack(alignment: .leading, spacing: 20) {
+      Button("コードを取得して接続", action: viewModel.startConnection)
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .frame(maxWidth: .infinity)
+        .disabled(!viewModel.isTokenConfigured || viewModel.isBusy)
+      DisclosureGroup("接続済みのWi2を引き継ぐ") {
+        VStack(alignment: .leading, spacing: 12) {
+          Stepper("ログインから約\(viewModel.elapsedMinutes)分", value: $viewModel.elapsedMinutes, in: 0...9)
+          Button("引き継いで開始", action: viewModel.resumeExistingSession)
+            .disabled(!viewModel.isTokenConfigured || viewModel.isBusy)
+        }
+        .padding(.top, 12)
+      }
+    }
+  }
+
+  private var sessionControls: some View {
+    VStack(alignment: .leading, spacing: 20) {
+      if let remainingTime = viewModel.remainingTime {
+        GroupBox("残り時間") {
+          Text(remainingTime)
+            .font(.system(size: 48, weight: .bold, design: .rounded))
+            .monospacedDigit()
+            .foregroundStyle(remainingTime == "00:00" ? .red : .primary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+        }
+      }
+      if let code = viewModel.state.currentCode {
+        codeView(title: "ゲストコード", code: code)
+      }
+      if let code = viewModel.state.renewalCode {
+        codeView(title: "更新用ゲストコード", code: code)
+      }
+      HStack {
+        Button("ログイン画面を開く", action: viewModel.openPortal)
+        Spacer()
+        if viewModel.state.awaitingLogin || viewModel.state.renewalCode != nil {
+          Button(viewModel.state.awaitingLogin ? "ログイン完了" : "更新完了", action: viewModel.confirmLogin)
+            .buttonStyle(.borderedProminent)
+            .disabled(viewModel.isBusy)
+        } else {
+          Button("コード取得を再試行", action: viewModel.retryRenewal)
+            .disabled(viewModel.isBusy || !viewModel.isTokenConfigured)
+        }
+      }
+    }
   }
 
   private func codeView(title: String, code: String) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text(title).foregroundStyle(.secondary)
+    GroupBox(title) {
       HStack {
         Text(code).font(.system(.title, design: .monospaced).weight(.semibold))
           .textSelection(.enabled)
+        Spacer()
         Button("コピー") { viewModel.copyCode(code) }
       }
+      .padding(8)
     }
   }
 }
