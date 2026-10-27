@@ -98,6 +98,13 @@ struct Wi2SessionView: View {
         codeView(title: "ゲストコード", code: code)
       }
       if let code = viewModel.state.renewalCode {
+        if viewModel.state.currentCode != nil {
+          Image(systemName: "chevron.down.2")
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(.tint)
+            .frame(maxWidth: .infinity)
+            .accessibilityHidden(true)
+        }
         codeView(title: "更新用ゲストコード", code: code)
       }
       HStack {

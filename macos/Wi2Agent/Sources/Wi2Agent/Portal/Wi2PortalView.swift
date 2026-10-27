@@ -17,7 +17,11 @@ struct Wi2PortalView: View {
           Button("コピー") { viewModel.copyCode(code) }
         }
         if viewModel.state.awaitingLogin || viewModel.state.renewalCode != nil {
-          Button(viewModel.state.awaitingLogin ? "ログイン完了" : "更新完了", action: viewModel.confirmLogin)
+          Button(viewModel.state.awaitingLogin ? "ログイン完了" : "更新完了") {
+            let isRenewal = viewModel.state.renewalCode != nil
+            viewModel.confirmLogin()
+            if isRenewal { browser.webView.window?.close() }
+          }
             .buttonStyle(.borderedProminent)
             .disabled(viewModel.isBusy)
         }
