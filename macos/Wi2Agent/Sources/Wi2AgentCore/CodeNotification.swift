@@ -13,7 +13,8 @@ public enum CodeNotification {
   public static func show(title: String, body: String) async throws {
     let center = UNUserNotificationCenter.current()
     let settings = await center.notificationSettings()
-    guard settings.authorizationStatus == .authorized, settings.alertSetting == .enabled else {
+    guard settings.authorizationStatus == .authorized, settings.alertSetting == .enabled,
+      settings.alertStyle != .none else {
       throw CodeNotificationError.permissionDenied
     }
     let content = UNMutableNotificationContent()

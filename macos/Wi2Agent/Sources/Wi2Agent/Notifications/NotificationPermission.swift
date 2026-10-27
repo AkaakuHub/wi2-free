@@ -15,7 +15,8 @@ final class NotificationPermission: ObservableObject {
 
   func refresh() async {
     let settings = await UNUserNotificationCenter.current().notificationSettings()
-    isAllowed = settings.authorizationStatus == .authorized && settings.alertSetting == .enabled
+    isAllowed = settings.authorizationStatus == .authorized
+      && settings.alertSetting == .enabled && settings.alertStyle != .none
   }
 
   func openSettings() {
@@ -38,7 +39,7 @@ final class NotificationPermission: ObservableObject {
     guard !isAllowed else { return }
     let alert = NSAlert()
     alert.messageText = "Wi2Agentの通知を許可してください"
-    alert.informativeText = requestError ?? "ゲストコードと残り2分の通知を表示します。システム設定で「通知を許可」とバナーを有効にしてください。"
+    alert.informativeText = requestError ?? "ゲストコードと利用期限の通知を表示します。システム設定で「通知を許可」とバナーを有効にしてください。"
     alert.addButton(withTitle: "通知設定を開く")
     alert.addButton(withTitle: "あとで")
     NSApplication.shared.activate(ignoringOtherApps: true)

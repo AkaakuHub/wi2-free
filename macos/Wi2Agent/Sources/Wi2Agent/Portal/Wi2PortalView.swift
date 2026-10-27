@@ -3,7 +3,7 @@ import WebKit
 
 struct Wi2PortalView: View {
   @ObservedObject var viewModel: Wi2SessionViewModel
-  @StateObject private var browser = PortalBrowser()
+  @ObservedObject var browser: PortalBrowser
 
   var body: some View {
     VStack(spacing: 0) {

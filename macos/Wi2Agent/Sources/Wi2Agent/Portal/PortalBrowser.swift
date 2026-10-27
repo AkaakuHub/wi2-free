@@ -15,7 +15,6 @@ final class PortalBrowser: NSObject, ObservableObject, WKNavigationDelegate, WKU
     webView.navigationDelegate = self
     webView.uiDelegate = self
     webView.allowsBackForwardNavigationGestures = true
-    openLogin()
   }
 
   func openLogin() {

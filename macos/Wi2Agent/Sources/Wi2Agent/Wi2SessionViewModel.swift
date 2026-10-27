@@ -19,6 +19,7 @@ final class Wi2SessionViewModel: ObservableObject {
   private let store = SessionStore()
   private var portalWindow: Wi2PortalWindow?
   private var timer: Timer?
+  private var renewalWindowSession: Date?
   private var isNotifyingRenewal = false
   private var nextNotificationRetryAt: Date?
 
@@ -119,6 +120,7 @@ final class Wi2SessionViewModel: ObservableObject {
     guard !isBusy else { return }
     state = SessionState()
     nextNotificationRetryAt = nil
+    renewalWindowSession = nil
     notificationError = nil
     persist()
     remainingTime = nil
@@ -133,30 +135,41 @@ final class Wi2SessionViewModel: ObservableObject {
 
   func openPortal() {
     if portalWindow == nil { portalWindow = Wi2PortalWindow(viewModel: self) }
-    portalWindow?.showWindow(nil)
+    portalWindow?.showLogin()
     NSApplication.shared.activate(ignoringOtherApps: true)
   }
 
   private func refreshTimer() {
     let now = Date()
     remainingTime = state.session.map { SessionClock.format(seconds: $0.remainingSeconds(at: now)) }
+    handleExpiry(at: now)
     guard !isBusy else { return }
     if state.shouldFetchRenewal(at: now), isTokenConfigured {
       prepareRenewalCode()
-    } else if state.shouldNotifyRenewal(at: now), let code = state.renewalCode,
-      !isNotifyingRenewal, nextNotificationRetryAt.map({ now >= $0 }) ?? true {
-      isNotifyingRenewal = true
-      Task {
-        defer { isNotifyingRenewal = false }
-        let sent = await notify(title: "Wi2の再ログインが必要です", body: "更新用コード: \(code)。Wi2画面でログアウト後、入力してください。")
-        guard state.renewalCode == code else { return }
-        if sent {
-          state.markRenewalNotified()
-          nextNotificationRetryAt = nil
-          persist()
-        } else {
-          nextNotificationRetryAt = Date().addingTimeInterval(15)
-        }
+    }
+  }
+
+  private func handleExpiry(at now: Date) {
+    guard let session = state.session, session.isExpired(at: now) else { return }
+    if renewalWindowSession != session.startedAt {
+      renewalWindowSession = session.startedAt
+      openPortal()
+    }
+    guard state.shouldNotifyRenewal(at: now), !isNotifyingRenewal,
+      nextNotificationRetryAt.map({ now >= $0 }) ?? true else { return }
+    isNotifyingRenewal = true
+    let body = state.renewalCode.map { "更新用コード: \($0)。ログイン画面で再ログインしてください。" }
+      ?? "更新用コードを取得できていません。アプリでコードを再取得してください。"
+    Task {
+      defer { isNotifyingRenewal = false }
+      let sent = await notify(title: "Wi2の利用時間が終了しました", body: body)
+      guard state.session?.startedAt == session.startedAt else { return }
+      if sent {
+        state.markRenewalNotified()
+        nextNotificationRetryAt = nil
+        persist()
+      } else {
+        nextNotificationRetryAt = Date().addingTimeInterval(15)
       }
     }
   }
@@ -170,7 +183,7 @@ final class Wi2SessionViewModel: ObservableObject {
       do {
         let code = try await fetchCode()
         if state.receiveRenewal(code: code, at: Date()) {
-          status = "更新用コードを確保しました。残り2分で通知します。再ログイン後に「更新完了」を押してください。"
+          status = "更新用コードを確保しました。利用期限に通知し、ログイン画面を開きます。"
         } else {
           isError = true
           status = "現在と同じコードが返りました。Wi2へのログインを確認してください。15秒後に再試行します。"

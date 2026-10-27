@@ -145,7 +145,7 @@ GitHubのReleasesからAppleシリコン搭載Mac向けの`Wi2Agent-macos-arm64.
 
 `v0.3.0`のようなタグのpushでGitHub Actionsがテストとビルドを行い、Releaseへインストーラーを添付します。同じタグの再実行ではSwiftのビルドキャッシュを再利用します。GitHubの制約により、異なるタグ間ではキャッシュを共有できません。アプリはad-hoc署名で、インストーラーは未署名・未公証です。初回起動時の操作は[macOS用README](macos/Wi2Agent/README.md)を参照してください。
 
-`macos/Wi2Agent`はコード取得後にWi2へ接続し、ゲストコードと残り時間を表示するmacOSアプリです。ログイン完了後に次回のコードを取得し、残り2分で通知します。取得失敗時は利用時間内に再試行し、アプリ再起動後も接続情報を復元します。キャプティブポータルへの入力は手動です。手順は[macos/Wi2Agent/README.md](macos/Wi2Agent/README.md)を参照してください。
+`macos/Wi2Agent`はコード取得後にWi2へ接続し、ゲストコードと残り時間を表示するmacOSアプリです。ログイン完了後に次回のコードを取得し、利用期限が切れた時点で通知し、ログイン用ウインドウを自動で開きます。取得失敗時は利用時間内に再試行し、アプリ再起動後も接続情報を復元します。キャプティブポータルへの入力は手動です。手順は[macos/Wi2Agent/README.md](macos/Wi2Agent/README.md)を参照してください。
 
 ## セキュリティ
 

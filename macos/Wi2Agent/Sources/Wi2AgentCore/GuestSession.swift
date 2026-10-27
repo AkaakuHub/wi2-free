@@ -2,7 +2,6 @@ import Foundation
 
 public struct GuestSession: Codable, Equatable, Sendable {
   public static let duration: TimeInterval = 10 * 60
-  public static let renewalLeadTime: TimeInterval = 2 * 60
 
   public let startedAt: Date
 
@@ -18,17 +17,10 @@ public struct GuestSession: Codable, Equatable, Sendable {
     max(0, expiresAt.timeIntervalSince(date))
   }
 
-  public func shouldPrepareRenewal(at date: Date) -> Bool {
-    date >= renewalAt && !isExpired(at: date)
-  }
-
   private var expiresAt: Date {
     startedAt.addingTimeInterval(Self.duration)
   }
 
-  private var renewalAt: Date {
-    expiresAt.addingTimeInterval(-Self.renewalLeadTime)
-  }
 }
 
 public enum SessionClock {

@@ -26,13 +26,13 @@ func wifiHardwarePortsReturnsNilWhenWiFiDeviceIsAbsent() {
 }
 
 @Test
-func guestSessionRequestsRenewalTwoMinutesBeforeExpiry() {
+func guestSessionExpiresAtTenMinutes() {
   let startedAt = Date(timeIntervalSince1970: 0)
   let session = GuestSession(startedAt: startedAt)
 
-  #expect(!session.shouldPrepareRenewal(at: startedAt.addingTimeInterval(479)))
-  #expect(session.shouldPrepareRenewal(at: startedAt.addingTimeInterval(480)))
-  #expect(!session.shouldPrepareRenewal(at: startedAt.addingTimeInterval(600)))
+  #expect(!session.isExpired(at: startedAt.addingTimeInterval(599)))
+  #expect(session.isExpired(at: startedAt.addingTimeInterval(600)))
+  #expect(session.remainingSeconds(at: startedAt.addingTimeInterval(600)) == 0)
 }
 
 @Test

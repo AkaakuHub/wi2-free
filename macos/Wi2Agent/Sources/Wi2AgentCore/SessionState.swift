@@ -47,8 +47,8 @@ public struct SessionState: Codable, Equatable, Sendable {
   }
 
   public func shouldNotifyRenewal(at date: Date) -> Bool {
-    guard let session, renewalCode != nil, !renewalNotified else { return false }
-    return session.remainingSeconds(at: date) <= GuestSession.renewalLeadTime
+    guard let session, !renewalNotified else { return false }
+    return session.isExpired(at: date)
   }
 
   public mutating func markRenewalNotified() {
